@@ -39,16 +39,34 @@ class CityDetector:
         if imshow:
             show_image('hsv', hsv)
 
+        # mask pink:
         config = self.config['pink_blob']
         mask = np.logical_and(config['h'][0] < hsv[:, :, :1], hsv[:, :, :1] < config['h'][1])  # TODO add threshold by config['s']
+        mask = 255 * mask.astype(np.uint8)
         # mask = np.repeat(mask, 3, axis=2)
-
         if imshow:
-            show_image('pink', 255 * mask.astype(np.uint8))
-        if out_path is not None:
-            cv2.imwrite(out_path, hsv)
+            show_image('pink', mask)
 
-        return None
+        # detect blobs in mask:
+        blob_params = cv2.SimpleBlobDetector_Params()  # https://docs.opencv.org/trunk/d8/da7/structcv_1_1SimpleBlobDetector_1_1Params.html
+        # TODO adapt params, currently only finds small circular blobs
+        detector = cv2.SimpleBlobDetector_create(blob_params)
+        mask = cv2.bitwise_not(mask)
+        blobs = detector.detect(mask)
+        mask = cv2.bitwise_not(mask)
+
+        print('detected %d blobs' % len(blobs))
+        for blob in blobs:
+            print(blob.pt, blob.size)
+
+        im_with_keypoints = cv2.drawKeypoints(mask, blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        if imshow:
+            show_image('blobs', im_with_keypoints)
+
+        if out_path is not None:
+            cv2.imwrite(out_path, mask)
+
+        return blobs
 
     @classmethod
     def default_config(cls):
