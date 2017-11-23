@@ -14,11 +14,30 @@ class CityVector:
         else:
             self.cities = {}
 
-    def _calc_azimuths(self):
-        def azimuth(xy1, xy2):
-            return np.rad2deg(np.math.atan2(xy2[1] - xy1[1], xy2[0] - xy1[0]))
+    def _azimuth(self, city1, city2):
+        x1, y1 = self.cities[city1]
+        x2, y2 = self.cities[city2]
+        return np.rad2deg(np.math.atan2(y2 - y1, x2 - x1))
 
-        azimuths = {(city1, city2): azimuth(self.cities[city1], self.cities[city2])
+    def _dist(self, city1, city2):
+        x1, y1 = self.cities[city1]
+        x2, y2 = self.cities[city2]
+        return np.linalg.norm([y2 - y1, x2 - x1])
+
+    def __getitem__(self, cities):
+        """
+        :param cities: (city1, city2)
+        :return: returns (azimuth, distance)
+        """
+        city1, city2 = cities
+        x1, y1 = self.cities[city1]
+        x2, y2 = self.cities[city2]
+        azimuth = np.rad2deg(np.math.atan2(y2 - y1, x2 - x1))
+        distance = np.linalg.norm([y2 - y1, x2 - x1])
+        return azimuth, distance
+
+    def _calc_azimuths(self):
+        azimuths = {(city1, city2): self._azimuth(city1, city2)
                     for city1 in self.cities for city2 in self.cities if city1 != city2}
         return azimuths
 
