@@ -1,4 +1,7 @@
+import itertools
+
 import numpy as np
+
 
 
 class CityVector:
@@ -13,6 +16,9 @@ class CityVector:
                 raise NotImplementedError
         else:
             self.cities = {}
+
+    def __iter__(self):
+        return iter(self.cities)
 
     def _azimuth(self, city1, city2):
         x1, y1 = self.cities[city1]
@@ -40,6 +46,30 @@ class CityVector:
         azimuths = {(city1, city2): self._azimuth(city1, city2)
                     for city1 in self.cities for city2 in self.cities if city1 != city2}
         return azimuths
+
+
+def match(cities1, cities2):
+    # TODO move to config:
+    THRESHOLD_AZIMUTH = 1  # [deg]
+
+    # find potential matches - those that agree on azimuth:
+    potential_matches = []  # list of pairs, each pair being 2 cities: (('tlv', 'j-m'), ('tlv', 'j-m'))
+    for pair1 in itertools.combinations(cities1, r=2):
+        az1, dist1 = cities1[list(pair1)]
+        # print(*pair1, az1, dist1)
+        for pair2 in itertools.permutations(cities2, r=2):
+            az2, dist2 = cities2[list(pair2)]
+            if abs(az1 - az2) < THRESHOLD_AZIMUTH:
+                potential_matches.append((pair1, pair2))
+    print('found %d potential matches' % len(potential_matches))
+    print('\n'.join([str(m) for m in potential_matches]))
+
+    # collect distance ratios:
+    print('\n\ncollect distance ratios')
+    ratios = [cities1._azimuth(*pair1) / cities2._azimuth(*pair2) for pair1, pair2 in potential_matches]
+    print(ratios)
+
+
 
 
 israel = CityVector({'tlv': (34.777303, 32.076025),
