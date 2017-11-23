@@ -1,5 +1,8 @@
 import itertools
+from copy import copy, deepcopy
 
+from uuid import uuid4
+import random
 import numpy as np
 
 
@@ -20,12 +23,15 @@ class CityVector:
     def __iter__(self):
         return iter(self.cities)
 
-    def _azimuth(self, city1, city2):
+    def __len__(self):
+        return len(self.cities)
+
+    def azimuth(self, city1, city2):
         x1, y1 = self.cities[city1]
         x2, y2 = self.cities[city2]
         return np.rad2deg(np.math.atan2(y2 - y1, x2 - x1))
 
-    def _dist(self, city1, city2):
+    def dist(self, city1, city2):
         x1, y1 = self.cities[city1]
         x2, y2 = self.cities[city2]
         return np.linalg.norm([y2 - y1, x2 - x1])
@@ -43,9 +49,15 @@ class CityVector:
         return azimuth, distance
 
     def _calc_azimuths(self):
-        azimuths = {(city1, city2): self._azimuth(city1, city2)
+        azimuths = {(city1, city2): self.azimuth(city1, city2)
                     for city1 in self.cities for city2 in self.cities if city1 != city2}
         return azimuths
+
+    def add_outliers(self, number):
+        cities = copy(self.cities)
+        for idx in range(number):
+            cities[str(uuid4())] = (random.uniform(0, 90), random.uniform(0, 90))
+        return CityVector(cities)
 
 
 def match(cities1, cities2):
@@ -61,13 +73,13 @@ def match(cities1, cities2):
             az2, dist2 = cities2[list(pair2)]
             if abs(az1 - az2) < THRESHOLD_AZIMUTH:
                 potential_matches.append((pair1, pair2))
-    print('found %d potential matches' % len(potential_matches))
+    print('\n\nfound %d potential matches:' % len(potential_matches))
     print('\n'.join([str(m) for m in potential_matches]))
 
     # collect distance ratios:
-    print('\n\ncollect distance ratios')
-    ratios = [cities1._azimuth(*pair1) / cities2._azimuth(*pair2) for pair1, pair2 in potential_matches]
-    print(ratios)
+    print('\n\ndistance ratios:')
+    ratios = [cities1.dist(*pair1) / cities2.dist(*pair2) for pair1, pair2 in potential_matches]
+    print(sorted(ratios))
 
 
 

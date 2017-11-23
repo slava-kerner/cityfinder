@@ -13,4 +13,5 @@ class TestCityVector(unittest.TestCase):
         # print(azimuths)
 
     def test_match(self):
-        match(israel, israel)
+        israel_with_outliers = israel.add_outliers(10)
+        match(israel, israel_with_outliers)
