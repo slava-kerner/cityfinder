@@ -1,6 +1,7 @@
 import itertools
 from copy import copy, deepcopy
 import operator
+import pyproj
 
 import cv2
 from affine import Affine
@@ -64,10 +65,11 @@ class CityVector:
 
 def match(cities1, cities2):
     # TODO move to config:
-    THRESHOLD_AZIMUTH = 1  # [deg]
-    BINS_NUM = 100
-    RATIO_TEST_THRESHOLD = 2  # ratio_test above that is success (result is significant)
-    RATIO_THRESHOLD = 1.01  # keep only those that agree with best ratio up to this rel_tol
+    THRESHOLD_AZIMUTH = 5  # [deg]
+    BINS_NUM = 20
+    RATIO_TEST_THRESHOLD = 1.5  # ratio_test above that is success (result is significant)
+    RATIO_THRESHOLD = 1.1  # keep only those that agree with best ratio up to this rel_tol
+    CANDIDATES_RATIO = 0.5
 
     # find potential matches - those that agree on azimuth:
     potential_matches = []  # list of pairs, each pair being 2 cities: (('tlv', 'j-m'), ('tlv', 'j-m'))
@@ -89,6 +91,7 @@ def match(cities1, cities2):
     # choose cluster. currently primitive - find largest bin, validate by comparing to 3rd largest bin
     print('\n\nfinding most dense cluster of ratios:')
     ratios = sorted(ratios)
+    ratios = np.log(ratios)
     min, max = np.min(ratios), np.max(ratios)
     hist = np.histogram(ratios, bins=BINS_NUM, range=(min, max))
     hist = {hist[1][idx]: hist[0][idx] for idx in range(len(hist[0]))}  # convert to {value->bin_size}
@@ -99,7 +102,7 @@ def match(cities1, cities2):
     print('\nratio_test: %f, success=%s' % (ratio_test, ratio_test_success))
     if not ratio_test_success:
         return []
-    best_ratio = hist[0][0]
+    best_ratio = np.exp(hist[0][0])
     print('best_ratio:', best_ratio)
 
     # filter potential matches, keeping only those with ratio close to best ratio:
@@ -123,7 +126,10 @@ def match(cities1, cities2):
     # filter city matches - only leave those, where most candidate matches are identical:
     def is_city_match_robust(candidates):
         cities, counts = np.unique(candidates, return_counts=True)
-        return cities[0] if counts[0] > 0.9 * len(candidates) else None  # robust
+        argsort = np.argsort(-counts)  # minus in order to argsort reverse (descending)
+        cities = cities[argsort]
+        counts = counts[argsort]
+        return cities[0] if counts[0] > CANDIDATES_RATIO * len(candidates) else None  # robust
 
     city_matches = {city: is_city_match_robust(candidates) for city, candidates in city_matches.items()}
     city_matches = {city: match for city, match in city_matches.items() if match is not None}
@@ -136,7 +142,8 @@ def match(cities1, cities2):
     print('\n\nsrc:', src)
     print('\n\ndst:', dst)
     affine = np.linalg.lstsq(src.transpose(), dst.transpose())
-    affine = affine[0].transpose()
+    print('\n\naffine:', affine)
+    affine = affine[0]
     affine = Affine(*np.ravel(affine))
     print('\n\naffine:', affine)
 
@@ -146,17 +153,30 @@ def match(cities1, cities2):
     h, _ = cv2.findHomography(src, dst, cv2.RANSAC)
     print('\n\nhomography:', h)
 
-israel = CityVector({'tlv': (34.777303, 32.076025),
+israel = CityVector({
+                     'tlv': (34.777303, 32.076025),
                      'j-m': (35.207415, 31.768136),
                      'haifa': (34.997550, 32.804523),
                      'tiberias': (35.533599, 32.793664),
-                     'beersheba': (34.790372, 31.249257),
-                     # 'jaffa': (34.756914, 32.050229),
+                     # 'beersheba': (34.790372, 31.249257),
                      'nazareth': (35.297864, 32.701897),
                      'gaza': (34.462414, 31.506374),
-                     'hebron': (35.101843, 31.532422),
-                     # TODO damasque, beyrouth
-                     'eilat': (34.945825, 29.553369)})
+                     # 'hebron': (35.101843, 31.532422),
+                     'aman': (35.927025, 31.962766),
+                     'nablus': (35.251627, 32.226124),
+                     'kiryat shmona': (35.570337, 33.210001),
+                     'kiryat gat': (34.771532, 31.609439),
+                     'netania': (34.850431, 32.311543),
+                     # 'eilat': (34.945825, 29.553369)
+                     })
+
+p_lonlat = pyproj.Proj(proj='latlong', datum='WGS84')
+p_utm = pyproj.Proj(proj='utm', zone=36, datum='WGS84')
+def lonlat_to_utm(lon, lat):
+    x, y = pyproj.transform(p_lonlat, p_utm, lon, lat)
+    return x, y
+
+israel_utm = CityVector({city: lonlat_to_utm(*coords) for city, coords in israel.cities.items()})
 
 
 def print_per_line(arr):

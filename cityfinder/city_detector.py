@@ -6,6 +6,20 @@ import PIL
 
 
 
+city_indices = {
+    '0': 'tlv',
+    '1': 'haifa',
+    '2': 'netania',
+    '3': 'gaza',
+    '4': 'nazareth',
+    '5': 'j-m',
+    '6': 'aman',
+    '7': 'kiryat gat',
+    '8': 'tiberias',
+    '9': 'kiryat shmona',
+    '10': 'nablus',
+}
+
 
 class CityDetector:
     def __init__(self, config=None, debug_path=None):
@@ -68,7 +82,8 @@ class CityDetector:
         blob_params.filterByCircularity = False
         blob_params.filterByConvexity = False
         blob_params.filterByInertia = False
-        blob_params.minArea = 200
+        blob_params.minDistBetweenBlobs = 100  # todo config
+        blob_params.minArea = 200  # todo config
         blob_params.maxArea = 1e10
         # TODO adapt params, currently only finds small circular blobs: https://stackoverflow.com/questions/39083360/why-cant-i-do-blob-detection-on-this-binary-image
         detector = cv2.SimpleBlobDetector_create(blob_params)
@@ -77,8 +92,8 @@ class CityDetector:
         mask = cv2.bitwise_not(mask)
 
         print('detected %d blobs' % len(blobs))
-        for blob in blobs:
-            print(blob.pt, blob.size)
+        # for blob in blobs:
+        #     print(blob.pt, blob.size)
 
         mask_with_blobs = cv2.drawKeypoints(mask, blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         if imshow:
@@ -88,12 +103,40 @@ class CityDetector:
 
         # choose largest blobs:
         blobs = sorted(blobs, key=lambda k: k.size, reverse=True)
-        largest_blobs = blobs[:config['num_blobs']]
+        # largest_blobs = blobs[:config['num_blobs']]
+        largest_blobs = self.choose_largest_fartest_blobs(blobs)
+
+        print('chose %d largest blobs' % len(largest_blobs))
         mask_with_largest_blobs = cv2.drawKeypoints(mask, largest_blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        w, h = mask.shape[:2]
+        print('w,h:', w, h)
+        largest_blobs = {city_indices[str(idx)]: (blob.pt[0], blob.pt[1]) for idx, blob in enumerate(largest_blobs)}
+        for idx, blob in largest_blobs.items():
+            print(str(idx))
+            print(blob)
+            x, y = blob
+            cv2.putText(mask_with_largest_blobs, str(idx), (int(x), int(y)), cv2.FONT_HERSHEY_SIMPLEX, 6, (0,255,0),2,cv2.LINE_AA)
         if out_folder is not None:
             cv2.imwrite(os.path.join(out_folder, '6_largest_blobs.png'), mask_with_largest_blobs)
 
-        return blobs
+        largest_blobs = {name: (correct_x(x, w), h - y) for name, (x, y) in largest_blobs.items()}
+        return largest_blobs
+
+    def choose_largest_fartest_blobs(self, blobs):
+        def are_blobs_close(blob1, blob2):
+            dist = np.linalg.norm(np.asarray(blob1.pt) - np.asarray(blob2.pt))
+            print('dist:', dist)
+            return dist < self.config['pink_blob']['eliminate_closest_pix']
+
+        blobs = sorted(blobs, key=lambda k: k.size, reverse=True)
+        best = []
+        while len(blobs) > 0:
+            print('ITERATION')
+            best_candidate = blobs[0]
+            best.append(best_candidate)
+            blobs = [b for b in blobs if not are_blobs_close(b, best_candidate)]
+        return best
+
 
     @classmethod
     def default_config(cls):
@@ -113,7 +156,8 @@ class CityDetector:
                 'median_size': 5,
                 'opening_radius': 3,
                 'closing_radius': 21,
-                'num_blobs': 10,
+                'eliminate_closest_pix': 500,
+                'num_blobs': 20,
             }
         }
         return config
@@ -123,3 +167,8 @@ def show_image(label, img):
     cv2.imshow(label, img)
     cv2.waitKey(0)
     cv2.destroyAllWindows()
+
+
+def correct_x(x, width):
+    factor = 0.66
+    return width/2 + factor * (x - width/2)

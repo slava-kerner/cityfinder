@@ -1,9 +1,11 @@
 import os
+import itertools
 
 from PIL import Image
 import numpy as np
 import unittest
 from cityfinder.city_detector import CityDetector
+from cityfinder.city_vector import CityVector, israel, israel_utm, match
 
 
 class TestCityDetector(unittest.TestCase):
@@ -53,6 +55,16 @@ class TestCityDetector(unittest.TestCase):
 
         config = CityDetector.default_config()
         detector = CityDetector(config=config)
-        # out_path = os.path.join(self.out_folder, name + '_hsv' + '.png')
 
-        pink = detector.find_pink_blob(self._path(name), imshow=False, out_folder=os.path.join(self.out_folder, name))
+        cities = detector.find_pink_blob(self._path(name), imshow=False, out_folder=os.path.join(self.out_folder, name))
+        print(cities)
+
+        cities = CityVector(cities)
+        match(cities, israel_utm)
+        # print('\n\n\n')
+        # relevant_cities = ['nablus', 'tlv', 'j-m', 'haifa', 'gaza', 'tiberias']
+        # for city1, city2 in itertools.combinations(relevant_cities, r=2):
+        #     pair = (city1, city2)
+        #     az1, d1 = cities[pair]
+        #     az2, d2 = israel_utm[pair]
+        #     print(*pair, az1 - az2, 100 * d1 / d2)
