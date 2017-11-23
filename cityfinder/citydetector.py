@@ -49,7 +49,7 @@ class CityDetector:
 
         # detect blobs in mask:
         blob_params = cv2.SimpleBlobDetector_Params()  # https://docs.opencv.org/trunk/d8/da7/structcv_1_1SimpleBlobDetector_1_1Params.html
-        # TODO adapt params, currently only finds small circular blobs
+        # TODO adapt params, currently only finds small circular blobs: https://stackoverflow.com/questions/39083360/why-cant-i-do-blob-detection-on-this-binary-image
         detector = cv2.SimpleBlobDetector_create(blob_params)
         mask = cv2.bitwise_not(mask)
         blobs = detector.detect(mask)
