@@ -24,7 +24,7 @@ class ImageComposer:
         paths = list(self.scan_folder(id))
         max_x = np.max([self.tile_index(path)[0] for path in paths])
         max_y = np.max([self.tile_index(path)[1] for path in paths])
-        return (max_x + 1) * tilesize, (max_y + 1) * tilesize
+        return max_x + tilesize, max_y + tilesize
 
     def compose(self, id):
         paths = list(self.scan_folder(id))
@@ -37,7 +37,9 @@ class ImageComposer:
         img = np.zeros((image_w, image_h, 3), dtype=np.uint8)
         for path in tqdm(paths, desc='composing tiles'):
             tile = Image.open(path)
-            assert tile.size[0] == tilesize and tile.size[1] == tilesize
+            if tile.size[0] != tilesize or tile.size[1] != tilesize:
+                continue
+            # assert tile.size[0] == tilesize and tile.size[1] == tilesize
             x, y = self.tile_index(path)
-            img[x * tilesize: x * tilesize + tilesize, y * tilesize: y * tilesize + tilesize, :] = np.asarray(tile, dtype=np.uint8)
-        return Image.fromarray(img)
+            img[x: x + tilesize, y: y + tilesize, :] = np.asarray(tile, dtype=np.uint8).transpose((1, 0, 2))
+        return Image.fromarray(img.transpose((1, 0, 2)))
