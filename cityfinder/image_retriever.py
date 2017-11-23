@@ -7,9 +7,8 @@ from PIL import Image
 
 
 class ImageComposer:
-    def __init__(self, folder, tilesize=None, extension='jpg'):
+    def __init__(self, folder, extension='jpg'):
         self.folder = folder
-        self.tilesize = tilesize
         self.extension = extension
 
     def scan_folder(self, id):
@@ -20,22 +19,25 @@ class ImageComposer:
         parts = path[:-(1+len(self.extension))].split('_')  # from smth like 'foo/bar_x_y.jpg' extracts x, y
         return int(parts[-2]), int(parts[-1])
 
-    def get_size(self, id):
-        """ returns size of raster based on max{x, y} and self.tilesize """
+    def get_size(self, id, tilesize):
+        """ returns size of raster based on max{x, y} and tilesize """
         paths = list(self.scan_folder(id))
         max_x = np.max([self.tile_index(path)[0] for path in paths])
         max_y = np.max([self.tile_index(path)[1] for path in paths])
-        return (max_x + 1) * self.tilesize, (max_y + 1) * self.tilesize
+        return (max_x + 1) * tilesize, (max_y + 1) * tilesize
 
     def compose(self, id):
-        w, h = self.get_size(id)
-        print('w=%d, h=%d' % (w, h))
-        img = np.zeros((w, h, 3), dtype=np.uint8)
         paths = list(self.scan_folder(id))
+        tile_w, tile_h = Image.open(paths[0]).size
+        assert tile_w == tile_h
+        tilesize = tile_w
+        
+        image_w, image_h = self.get_size(id, tilesize)
+        print('w=%d, h=%d' % (image_w, image_h))
+        img = np.zeros((image_w, image_h, 3), dtype=np.uint8)
         for path in tqdm(paths, desc='composing tiles'):
             tile = Image.open(path)
-            assert tile.size[0] == self.tilesize and tile.size[1] == self.tilesize
+            assert tile.size[0] == tilesize and tile.size[1] == tilesize
             x, y = self.tile_index(path)
-            img[x * self.tilesize: x * self.tilesize + self.tilesize,
-                y * self.tilesize: y * self.tilesize + self.tilesize, :] = np.asarray(tile, dtype=np.uint8)
+            img[x * tilesize: x * tilesize + tilesize, y * tilesize: y * tilesize + tilesize, :] = np.asarray(tile, dtype=np.uint8)
         return Image.fromarray(img)
