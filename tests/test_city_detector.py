@@ -1,5 +1,6 @@
 import os
 
+from PIL import Image
 import numpy as np
 import unittest
 from cityfinder.city_detector import CityDetector
@@ -37,10 +38,21 @@ class TestCityDetector(unittest.TestCase):
         print(sorted(radii))
 
     def test_find_pink_blob(self):
-        name = 'tulkarm'
+        name = 'big_downsampled'
+
+        # downsamples:
+        # path = self._path(name)
+        # img = Image.open(path)
+        # print(img.size)
+        # new_size = (img.size[0] // 4, img.size[0] // 4)
+        # out_path = path[:-4] + '_downsampled.png'
+        # img_downsampled = img.resize(new_size)
+        # print(img_downsampled.size)
+        # img_downsampled.save(out_path)
+        # return
 
         config = CityDetector.default_config()
         detector = CityDetector(config=config)
-        out_path = os.path.join(self.out_folder, name + '_hsv' + '.png')
+        # out_path = os.path.join(self.out_folder, name + '_hsv' + '.png')
 
-        pink = detector.find_pink_blob(self._path(name), imshow=True, out_path=out_path)
+        pink = detector.find_pink_blob(self._path(name), imshow=False, out_folder=os.path.join(self.out_folder, name))

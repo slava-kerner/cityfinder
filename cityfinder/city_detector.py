@@ -1,3 +1,5 @@
+import os
+
 import cv2
 import numpy as np
 import PIL
@@ -32,12 +34,17 @@ class CityDetector:
             cv2.imwrite(out_path, cimg)
         return circles[0]
 
-    def find_pink_blob(self, path, out_path=None, imshow=False):
+    def find_pink_blob(self, path, out_folder=None, imshow=False):
         img = cv2.imread(path)
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '1_rgb.png'), img)
 
+        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
+        os.makedirs(out_folder, exist_ok=True)
         if imshow:
             show_image('hsv', hsv)
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '2_hsv.png'), hsv)
 
         # mask pink:
         config = self.config['pink_blob']
@@ -46,9 +53,23 @@ class CityDetector:
         # mask = np.repeat(mask, 3, axis=2)
         if imshow:
             show_image('pink', mask)
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '3_mask.png'), mask)
+
+        # morphology:
+        mask = cv2.medianBlur(mask, config['median_size'])
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((config['opening_radius'], config['opening_radius']), np.uint8))
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, np.ones((config['closing_radius'], config['closing_radius']), np.uint8))
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '4_mask_closed.png'), mask)
 
         # detect blobs in mask:
         blob_params = cv2.SimpleBlobDetector_Params()  # https://docs.opencv.org/trunk/d8/da7/structcv_1_1SimpleBlobDetector_1_1Params.html
+        blob_params.filterByCircularity = False
+        blob_params.filterByConvexity = False
+        blob_params.filterByInertia = False
+        blob_params.minArea = 200
+        blob_params.maxArea = 1e10
         # TODO adapt params, currently only finds small circular blobs: https://stackoverflow.com/questions/39083360/why-cant-i-do-blob-detection-on-this-binary-image
         detector = cv2.SimpleBlobDetector_create(blob_params)
         mask = cv2.bitwise_not(mask)
@@ -59,12 +80,18 @@ class CityDetector:
         for blob in blobs:
             print(blob.pt, blob.size)
 
-        im_with_keypoints = cv2.drawKeypoints(mask, blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        mask_with_blobs = cv2.drawKeypoints(mask, blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
         if imshow:
-            show_image('blobs', im_with_keypoints)
+            show_image('blobs', mask_with_blobs)
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '5_blobs.png'), mask_with_blobs)
 
-        if out_path is not None:
-            cv2.imwrite(out_path, mask)
+        # choose largest blobs:
+        blobs = sorted(blobs, key=lambda k: k.size, reverse=True)
+        largest_blobs = blobs[:config['num_blobs']]
+        mask_with_largest_blobs = cv2.drawKeypoints(mask, largest_blobs, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        if out_folder is not None:
+            cv2.imwrite(os.path.join(out_folder, '6_largest_blobs.png'), mask_with_largest_blobs)
 
         return blobs
 
@@ -83,6 +110,10 @@ class CityDetector:
             'pink_blob': {
                 'h': [150, 180],
                 's': [50, 60],
+                'median_size': 5,
+                'opening_radius': 3,
+                'closing_radius': 21,
+                'num_blobs': 10,
             }
         }
         return config

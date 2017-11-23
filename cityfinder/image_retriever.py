@@ -1,7 +1,6 @@
 from glob import glob
 import os
 
-from tqdm import tqdm
 import numpy as np
 from PIL import Image
 
@@ -35,7 +34,7 @@ class ImageComposer:
         image_w, image_h = self.get_size(id, tilesize)
         print('w=%d, h=%d' % (image_w, image_h))
         img = np.zeros((image_w, image_h, 3), dtype=np.uint8)
-        for path in tqdm(paths, desc='composing tiles'):
+        for path in paths:
             tile = Image.open(path)
             if tile.size[0] != tilesize or tile.size[1] != tilesize:
                 continue
