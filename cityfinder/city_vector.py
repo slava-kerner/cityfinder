@@ -20,3 +20,11 @@ class CityVector:
 
         azimuths = {(city1, city2): azimuth(self.cities[city1], self.cities[city2])
                     for city1 in self.cities for city2 in self.cities if city1 != city2}
+        return azimuths
+
+
+israel = CityVector({'tlv': (34.777303, 32.076025),
+                     'j-m': (35.207415, 31.768136),
+                     'haifa': (34.997550, 32.804523),
+                     'beersheba': (34.790372, 31.249257),
+                     'eilat': (34.945825, 29.553369)})
