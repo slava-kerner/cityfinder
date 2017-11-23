@@ -2,7 +2,7 @@ import os
 
 import numpy as np
 import unittest
-from cityfinder.citydetector import CityDetector
+from cityfinder.city_detector import CityDetector
 
 
 class TestCityDetector(unittest.TestCase):

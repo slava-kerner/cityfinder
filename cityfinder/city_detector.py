@@ -11,7 +11,7 @@ class CityDetector:
         self.debug_path = debug_path
 
     def find_circle_city(self, path, out_path=None, imshow=False):
-        img = cv2.imread(path)
+        img = cv2.imread(path, 0)
         # img = cv2.medianBlur(img, 5)
 
         config = self.config['hough_circle']
