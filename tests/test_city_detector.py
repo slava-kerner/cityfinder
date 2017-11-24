@@ -1,11 +1,16 @@
 import os
 import itertools
 
+import rasterio
 from PIL import Image
 import numpy as np
 import unittest
 from cityfinder.city_detector import CityDetector
 from cityfinder.city_vector import CityVector, israel, israel_utm, match
+
+
+GEOGRAPHIC = {'init': 'EPSG:4326'}
+UTM = {'init': 'EPSG:32636'}
 
 
 class TestCityDetector(unittest.TestCase):
@@ -41,12 +46,13 @@ class TestCityDetector(unittest.TestCase):
 
     def test_find_pink_blob(self):
         name = 'big_downsampled'
+        downsample = 4
 
         # downsamples:
         # path = self._path(name)
         # img = Image.open(path)
         # print(img.size)
-        # new_size = (img.size[0] // 4, img.size[0] // 4)
+        # new_size = (img.size[0] // downsample, img.size[0] // downsample)
         # out_path = path[:-4] + '_downsampled.png'
         # img_downsampled = img.resize(new_size)
         # print(img_downsampled.size)
@@ -56,11 +62,24 @@ class TestCityDetector(unittest.TestCase):
         config = CityDetector.default_config()
         detector = CityDetector(config=config)
 
-        cities = detector.find_pink_blob(self._path(name), imshow=False, out_folder=os.path.join(self.out_folder, name))
+        out_folder = os.path.join(self.out_folder, name)
+        cities = detector.find_pink_blob(self._path(name), imshow=False, out_folder=out_folder)
         print(cities)
 
         cities = CityVector(cities)
-        match(cities, israel_utm)
+        aff, crs = match(cities, israel)
+
+        res = np.sqrt(np.abs(aff.determinant)) / downsample
+        scale = res * 2000
+        print('gsd = %0.2f m/pix, scale = %d' % (res, scale))
+
+        geotiff_path = os.path.join(out_folder, 'result.tif')
+        with rasterio.open(self._path(name), 'r') as src:
+            arr = src.read()
+            with rasterio.open(geotiff_path, 'w', driver='GTiff', transform=aff, crs=crs, nodata=0,
+                               count=arr.shape[0], width=arr.shape[1], height=arr.shape[1], dtype=rasterio.uint8) as dst:
+                dst.write(src.read())
+
         # print('\n\n\n')
         # relevant_cities = ['nablus', 'tlv', 'j-m', 'haifa', 'gaza', 'tiberias']
         # for city1, city2 in itertools.combinations(relevant_cities, r=2):

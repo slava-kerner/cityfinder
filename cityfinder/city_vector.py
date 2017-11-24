@@ -2,12 +2,16 @@ import itertools
 from copy import copy, deepcopy
 import operator
 import pyproj
+import shapely.geometry
 
 import cv2
 from affine import Affine
 from uuid import uuid4
 import random
 import numpy as np
+
+from cityfinder.geo import transform, p_geographic, p_utm, lonlat_to_utm, fit_affine, UTM
+from cityfinder.gcp import GCP
 
 
 class CityVector:
@@ -136,22 +140,32 @@ def match(cities1, cities2):
     print('\n\nfinal matches:')
     print_per_line(city_matches.items())
 
+    def correct_x_back(x, width):
+        factor = 1 / 0.66
+        return width / 2 + factor * (x - width / 2)
     # find affine:
-    src = np.array([[cities1.cities[m][0] for m in city_matches.keys()], [cities1.cities[m][1] for m in city_matches.keys()]])
-    dst = np.array([[cities2.cities[m][0] for m in city_matches.values()], [cities2.cities[m][1] for m in city_matches.values()], [1] * len(city_matches.values())])
-    print('\n\nsrc:', src)
-    print('\n\ndst:', dst)
-    affine = np.linalg.lstsq(src.transpose(), dst.transpose())
-    print('\n\naffine:', affine)
-    affine = affine[0]
-    affine = Affine(*np.ravel(affine))
-    print('\n\naffine:', affine)
+    # print('before hack:', city_matches)
+    city_matches = {k: v for idx, (k, v) in enumerate(list(city_matches.items())) if idx in [0, 1, 2, 3, 4]}
+    # print('after hack:', city_matches)
+    src = np.array([[cities2.cities[m][0] for m in city_matches.values()], [cities2.cities[m][1] for m in city_matches.values()]])
+    dst = np.array([[correct_x_back(cities1.cities[m][0], 4147) for m in city_matches.keys()], [cities1.cities[m][1] for m in city_matches.keys()], [1] * len(city_matches.values())])
 
-    # find homography:
-    src = np.array([[*cities1.cities[m]] for m in city_matches.keys()])
-    dst = np.array([[*cities2.cities[m]] for m in city_matches.values()])
-    h, _ = cv2.findHomography(src, dst, cv2.RANSAC)
-    print('\n\nhomography:', h)
+    width, height = 4147, 4147  # TODO HACK
+
+    gcps = []
+    for city1, city2 in city_matches.items():
+        pix = cities1.cities[city1]
+        lonlat = cities2.cities[city2]
+        gcps.append(GCP(*lonlat, None, '', correct_x_back(pix[0], width=width), height - pix[1]))
+
+    # affine, _ = fit_affine(gcps, p_geographic)
+    # print('geographic:', affine)
+
+    affine, _ = fit_affine(gcps, p_utm)
+    print('utm:', affine)
+
+    return affine, UTM
+
 
 israel = CityVector({
                      'tlv': (34.777303, 32.076025),
@@ -170,14 +184,9 @@ israel = CityVector({
                      # 'eilat': (34.945825, 29.553369)
                      })
 
-p_lonlat = pyproj.Proj(proj='latlong', datum='WGS84')
-p_utm = pyproj.Proj(proj='utm', zone=36, datum='WGS84')
-def lonlat_to_utm(lon, lat):
-    x, y = pyproj.transform(p_lonlat, p_utm, lon, lat)
-    return x, y
-
 israel_utm = CityVector({city: lonlat_to_utm(*coords) for city, coords in israel.cities.items()})
 
 
 def print_per_line(arr):
     print('\n'.join([str(m) for m in arr]))
+    
